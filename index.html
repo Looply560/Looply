@@ -34,25 +34,32 @@
       border:none;
     }
 
-    button {
-      background:#ff2d55;
-      color:white;
-      cursor:pointer;
-    }
+    button { background:#ff2d55; color:white; cursor:pointer; }
 
-    img {
-      max-width:100%;
-      border-radius:10px;
-      margin-top:10px;
-    }
+    img { max-width:100%; border-radius:10px; margin-top:10px; }
 
     .btn {
       padding:8px;
       background:#333;
       margin-top:5px;
       border-radius:6px;
-      cursor:pointer;
       text-align:center;
+      cursor:pointer;
+    }
+
+    .profile {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      cursor:pointer;
+      margin-bottom:5px;
+    }
+
+    .avatar {
+      width:30px;
+      height:30px;
+      border-radius:50%;
+      background:#444;
     }
 
     .comment {
@@ -69,8 +76,10 @@
 
 <div class="sidebar">
   <h2>Looply</h2>
+
   <div class="menu" onclick="show('login')">Login</div>
   <div class="menu" onclick="show('explore')">Explore</div>
+  <div class="menu" onclick="show('following')">Following</div>
   <div class="menu" onclick="show('create')">Create</div>
   <div class="menu" onclick="show('trending')">Trending</div>
 </div>
@@ -84,6 +93,9 @@
     <input id="emailInput" placeholder="Email">
     <input id="passwordInput" type="password" placeholder="Password">
 
+    <input id="usernameInput" placeholder="Username">
+    <input id="avatarInput" placeholder="Profile Pic URL">
+
     <button onclick="signup()">Sign Up</button>
     <button onclick="login()">Login</button>
   </div>
@@ -94,13 +106,17 @@
     <div id="feed"></div>
   </div>
 
+  <!-- FOLLOWING -->
+  <div id="following" class="page">
+    <h2>Following</h2>
+    <div id="followFeed"></div>
+  </div>
+
   <!-- CREATE -->
   <div id="create" class="page">
     <h2>Create Post</h2>
-
     <input id="text" placeholder="What's looping?">
     <input id="img" placeholder="Image URL">
-
     <button onclick="createPost()">Post</button>
   </div>
 
@@ -114,36 +130,40 @@
 
 <script>
 
-/* ================= SUPABASE CONFIG ================= */
+/* ================= CONFIG ================= */
 const SUPABASE_URL = "https://vspsewltuwxtxgvvkfel.supabase.co";
 const SUPABASE_KEY = "sb_publishable_uiKoJmabgcECsQkhQ_l6nA_Ll429aPH";
 
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* ================= AUTH ================= */
+let currentUser = null;
+
+/* ================= SIGNUP ================= */
 async function signup(){
-  let { data, error } = await client.auth.signUp({
+
+  let { data: userData } = await client.auth.signUp({
     email: emailInput.value,
     password: passwordInput.value
   });
 
-  if(error){
-    alert(error.message);
-  } else {
-    alert("Account created! You can now log in.");
-  }
+  await client.from("profiles").insert([{
+    id: userData.user.id,
+    username: usernameInput.value,
+    avatar: avatarInput.value
+  }]);
+
+  alert("Account created!");
 }
 
+/* ================= LOGIN ================= */
 async function login(){
-  let { data, error } = await client.auth.signInWithPassword({
+
+  let { data } = await client.auth.signInWithPassword({
     email: emailInput.value,
     password: passwordInput.value
   });
 
-  if(error){
-    alert(error.message);
-    return;
-  }
+  currentUser = data.user;
 
   show('explore');
   loadPosts();
@@ -153,16 +173,16 @@ async function login(){
 function show(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById(page).classList.add('active');
+  loadPosts();
 }
 
-/* ================= CREATE POST ================= */
+/* ================= CREATE ================= */
 async function createPost(){
 
   let u = await client.auth.getUser();
 
   await client.from("posts").insert([{
     user_id: u.data.user.id,
-    user_name: u.data.user.email,
     content: text.value,
     image: img.value
   }]);
@@ -173,56 +193,24 @@ async function createPost(){
   loadPosts();
 }
 
-/* ================= LOAD POSTS ================= */
-async function loadPosts(){
+/* ================= FOLLOW ================= */
+async function follow(userId){
 
-  let { data: posts } = await client
-    .from("posts")
+  let u = await client.auth.getUser();
+
+  let { data } = await client.from("follows")
     .select("*")
-    .order("id",{ascending:false});
+    .eq("follower_id", u.data.user.id)
+    .eq("following_id", userId);
 
-  let { data: likes } = await client.from("likes").select("*");
-  let { data: comments } = await client.from("comments").select("*");
+  if(data.length) return;
 
-  render(posts || [], likes || [], comments || []);
-}
+  await client.from("follows").insert([{
+    follower_id: u.data.user.id,
+    following_id: userId
+  }]);
 
-/* ================= RENDER ================= */
-function render(posts, likes, comments){
-
-  feed.innerHTML = "";
-  trendFeed.innerHTML = "";
-
-  let trending = [...posts].sort((a,b)=>b.id - a.id);
-
-  posts.forEach(p => drawPost(p, likes, comments, feed));
-  trending.slice(0,5).forEach(p => drawPost(p, likes, comments, trendFeed));
-}
-
-/* ================= DRAW ================= */
-function drawPost(p, likes, comments, container){
-
-  let postLikes = likes.filter(l => l.post_id === p.id).length;
-  let postComments = comments.filter(c => c.post_id === p.id);
-
-  let el = document.createElement("div");
-  el.className = "post";
-
-  el.innerHTML = `
-    <b>${p.user_name}</b>
-    <div>${p.content || ""}</div>
-    ${p.image ? `<img src="${p.image}">` : ""}
-
-    <div class="btn" onclick='likePost(${JSON.stringify(p)})'>
-      ❤️ ${postLikes}
-    </div>
-
-    ${postComments.map(c => `
-      <div class="comment">💬 ${c.user_name}: ${c.text}</div>
-    `).join("")}
-  `;
-
-  container.appendChild(el);
+  loadPosts();
 }
 
 /* ================= LIKE ================= */
@@ -235,7 +223,7 @@ async function likePost(post){
     .eq("user_id", u.data.user.id)
     .eq("post_id", post.id);
 
-  if(data.length > 0) return alert("Already liked");
+  if(data.length) return;
 
   await client.from("likes").insert([{
     user_id: u.data.user.id,
@@ -243,6 +231,72 @@ async function likePost(post){
   }]);
 
   loadPosts();
+}
+
+/* ================= LOAD ================= */
+async function loadPosts(){
+
+  let { data: posts } = await client.from("posts").select("*").order("id",{ascending:false});
+  let { data: profiles } = await client.from("profiles").select("*");
+  let { data: likes } = await client.from("likes").select("*");
+  let { data: follows } = await client.from("follows").select("*");
+
+  render(posts || [], profiles || [], likes || [], follows || []);
+}
+
+/* ================= RENDER ================= */
+function render(posts, profiles, likes, follows){
+
+  feed.innerHTML = "";
+  followFeed.innerHTML = "";
+  trendFeed.innerHTML = "";
+
+  let trending = [...posts].sort((a,b)=>b.id - a.id);
+
+  posts.forEach(p=>draw(p, profiles, likes, follows, feed));
+
+  let u = currentUser?.id;
+
+  let followingIds = follows
+    .filter(f=>f.follower_id === u)
+    .map(f=>f.following_id);
+
+  posts
+    .filter(p=>followingIds.includes(p.user_id))
+    .forEach(p=>draw(p, profiles, likes, follows, followFeed));
+
+  trending.slice(0,5).forEach(p=>draw(p, profiles, likes, follows, trendFeed));
+}
+
+/* ================= DRAW ================= */
+function draw(p, profiles, likes, follows, container){
+
+  let profile = profiles.find(pr=>pr.id === p.user_id);
+
+  let postLikes = likes.filter(l=>l.post_id === p.id).length;
+
+  let el = document.createElement("div");
+  el.className = "post";
+
+  el.innerHTML = `
+    <div class="profile">
+      <div class="avatar" style="background-image:url('${profile?.avatar || ""}'); background-size:cover;"></div>
+      <b>${profile?.username || "user"}</b>
+    </div>
+
+    <div>${p.content || ""}</div>
+    ${p.image ? `<img src="${p.image}">` : ""}
+
+    <div class="btn" onclick='likePost(${JSON.stringify(p)})'>
+      ❤️ ${postLikes}
+    </div>
+
+    <div class="btn" onclick="follow('${p.user_id}')">
+      👥 Follow
+    </div>
+  `;
+
+  container.appendChild(el);
 }
 
 /* ================= INIT ================= */
