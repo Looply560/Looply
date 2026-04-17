@@ -3,63 +3,98 @@
 <head>
   <title>Looply</title>
   <style>
-    body { margin:0; font-family:Arial; display:flex; background:#f2f2f2; }
+    body {
+      margin: 0;
+      font-family: Arial;
+      display: flex;
+      background: #f2f2f2;
+    }
 
     .sidebar {
-      width:180px; height:100vh; background:#111; color:white;
-      padding:10px; position:fixed;
+      width: 180px;
+      height: 100vh;
+      background: #111;
+      color: white;
+      padding: 10px;
+      position: fixed;
     }
 
     .menu {
-      padding:10px; background:#222; margin:10px 0; cursor:pointer;
-      border-radius:5px;
+      padding: 10px;
+      background: #222;
+      margin: 10px 0;
+      cursor: pointer;
+      border-radius: 5px;
     }
 
-    .main { margin-left:190px; width:100%; padding:10px; }
+    .main {
+      margin-left: 190px;
+      width: 100%;
+      padding: 10px;
+    }
 
-    .page { display:none; }
-    .active { display:block; }
+    .page {
+      display: none;
+    }
+
+    .active {
+      display: block;
+    }
 
     .post {
-      background:white; padding:10px; margin:10px 0; border-radius:10px;
+      background: white;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 10px;
     }
 
     input, button {
-      width:100%; padding:10px; margin-top:5px;
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
     }
 
-    img { max-width:100%; border-radius:10px; margin-top:10px; }
+    img {
+      max-width: 100%;
+      border-radius: 10px;
+      margin-top: 10px;
+    }
 
     .actions {
-      display:flex;
-      gap:10px;
-      margin-top:5px;
+      display: flex;
+      gap: 10px;
+      margin-top: 5px;
     }
 
     .btn {
-      flex:1;
-      padding:8px;
-      text-align:center;
-      cursor:pointer;
-      border-radius:5px;
-      background:#eee;
+      flex: 1;
+      padding: 8px;
+      text-align: center;
+      cursor: pointer;
+      border-radius: 5px;
+      background: #eee;
     }
 
-    .liked { background:#ffd6d6; }
-    .followed { background:#d6e6ff; }
+    .liked {
+      background: #ffd6d6;
+    }
+
+    .followed {
+      background: #d6e6ff;
+    }
 
     .comment {
-      font-size:12px;
-      background:#eee;
-      padding:5px;
-      margin-top:5px;
-      border-radius:5px;
+      font-size: 12px;
+      background: #eee;
+      padding: 5px;
+      margin-top: 5px;
+      border-radius: 5px;
     }
 
     .usernameLock {
-      font-size:12px;
-      color:gray;
-      margin-bottom:5px;
+      font-size: 12px;
+      color: gray;
+      margin-bottom: 5px;
     }
   </style>
 </head>
@@ -75,11 +110,13 @@
 
 <div class="main">
 
+  <!-- EXPLORE -->
   <div id="explore" class="page active">
     <h2>Explore</h2>
     <div id="feed"></div>
   </div>
 
+  <!-- CREATE -->
   <div id="create" class="page">
     <h2>Create Post</h2>
 
@@ -92,6 +129,7 @@
     <button onclick="post()">Post</button>
   </div>
 
+  <!-- FOLLOWING -->
   <div id="following" class="page">
     <h2>Following Feed</h2>
     <div id="followFeed"></div>
@@ -105,7 +143,7 @@ let posts = JSON.parse(localStorage.getItem("posts") || "[]");
 let currentUser = localStorage.getItem("user") || "";
 let following = JSON.parse(localStorage.getItem("following") || "[]");
 
-/* LOCK USERNAME */
+/* SET USERNAME (LOCKED) */
 function saveUser(){
   if(!currentUser){
     currentUser = user.value.trim();
@@ -125,9 +163,9 @@ function updateUserUI(){
     : "No username set yet";
 }
 
-/* NAV */
+/* NAVIGATION */
 function show(page){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(page).classList.add('active');
   render();
 }
@@ -162,7 +200,7 @@ function save(){
 
 /* LIKE TOGGLE */
 function like(id){
-  let p = posts.find(x=>x.id===id);
+  let p = posts.find(x => x.id === id);
 
   if(p.liked){
     p.liked = false;
@@ -181,7 +219,7 @@ function follow(user){
   if(user === currentUser) return;
 
   if(following.includes(user)){
-    following = following.filter(u=>u!==user);
+    following = following.filter(u => u !== user);
   } else {
     following.push(user);
   }
@@ -192,7 +230,7 @@ function follow(user){
 
 /* COMMENT */
 function comment(id, textInput){
-  let p = posts.find(x=>x.id===id);
+  let p = posts.find(x => x.id === id);
   if(!textInput.trim()) return;
 
   p.comments.unshift({
@@ -204,49 +242,56 @@ function comment(id, textInput){
   render();
 }
 
-/* RENDER */
+/* RENDER (FIXED FOLLOWING SYSTEM) */
 function render(){
 
   feed.innerHTML = "";
   followFeed.innerHTML = "";
 
-  posts.forEach(p=>{
+  posts.forEach(p => {
 
-    let el = document.createElement("div");
-    el.className="post";
+    function makePost() {
+      let el = document.createElement("div");
+      el.className = "post";
 
-    let isLiked = p.liked ? "liked" : "";
-    let isFollowed = following.includes(p.user) ? "followed" : "";
+      let isLiked = p.liked ? "liked" : "";
+      let isFollowed = following.includes(p.user) ? "followed" : "";
 
-    el.innerHTML = `
-      <b>${p.user}</b>
+      el.innerHTML = `
+        <b>${p.user}</b>
 
-      <div>${p.text}</div>
-      ${p.img ? `<img src="${p.img}">` : ""}
+        <div>${p.text}</div>
+        ${p.img ? `<img src="${p.img}">` : ""}
 
-      <div class="actions">
-        <div class="btn ${isLiked}" onclick="like(${p.id})">
-          ❤️ ${p.likes}
+        <div class="actions">
+          <div class="btn ${isLiked}" onclick="like(${p.id})">
+            ❤️ ${p.likes}
+          </div>
+
+          <div class="btn ${isFollowed}" onclick="follow('${p.user}')">
+            👥 Follow
+          </div>
         </div>
 
-        <div class="btn ${isFollowed}" onclick="follow('${p.user}')">
-          👥 Follow
+        <input placeholder="comment..."
+          onkeydown="if(event.key==='Enter'){comment(${p.id}, this.value); this.value=''}">
+
+        <div>
+          ${p.comments.map(c =>
+            `<div class="comment"><b>${c.user}:</b> ${c.text}</div>`
+          ).join("")}
         </div>
-      </div>
+      `;
 
-      <input placeholder="comment..." onkeydown="if(event.key==='Enter'){comment(${p.id}, this.value); this.value=''}">
+      return el;
+    }
 
-      <div>
-        ${p.comments.map(c=>
-          `<div class="comment"><b>${c.user}:</b> ${c.text}</div>`
-        ).join("")}
-      </div>
-    `;
+    // Always show in Explore
+    feed.appendChild(makePost());
 
-    feed.appendChild(el);
-
+    // Only show in Following if followed
     if(following.includes(p.user)){
-      followFeed.appendChild(el.cloneNode(true));
+      followFeed.appendChild(makePost());
     }
   });
 }
