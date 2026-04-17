@@ -5,73 +5,49 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
-    body {
-      margin:0;
-      font-family: Arial;
-      background:#0f0f0f;
-      color:white;
-      display:flex;
-    }
+    body { margin:0; font-family:Arial; background:#0f0f0f; color:white; display:flex; }
 
     .sidebar {
-      width:180px;
-      height:100vh;
-      background:#111;
-      padding:10px;
-      position:fixed;
+      width:180px; height:100vh; background:#111;
+      padding:10px; position:fixed;
     }
 
     .menu {
-      padding:10px;
-      margin:10px 0;
-      background:#222;
-      border-radius:8px;
-      cursor:pointer;
+      padding:10px; margin:10px 0;
+      background:#222; border-radius:8px; cursor:pointer;
     }
 
-    .main {
-      margin-left:190px;
-      width:100%;
-      padding:15px;
-    }
+    .main { margin-left:190px; width:100%; padding:15px; }
 
     .page { display:none; }
     .active { display:block; }
 
     .post {
-      background:#1a1a1a;
-      padding:12px;
-      margin:12px 0;
-      border-radius:12px;
+      background:#1a1a1a; padding:12px;
+      margin:12px 0; border-radius:12px;
     }
 
     input, button {
-      width:100%;
-      padding:10px;
-      margin-top:6px;
-      border-radius:6px;
-      border:none;
+      width:100%; padding:10px; margin-top:6px;
+      border-radius:6px; border:none;
     }
 
-    button {
-      background:#ff2d55;
-      color:white;
-      cursor:pointer;
-    }
+    button { background:#ff2d55; color:white; cursor:pointer; }
 
     img {
-      max-width:100%;
-      border-radius:10px;
+      max-width:100%; border-radius:10px;
       margin-top:10px;
     }
 
     .btn {
-      padding:8px;
-      background:#333;
-      margin-top:5px;
-      border-radius:6px;
-      text-align:center;
-      cursor:pointer;
+      padding:8px; background:#333;
+      margin-top:5px; border-radius:6px;
+      text-align:center; cursor:pointer;
+    }
+
+    .comment {
+      font-size:13px; margin-top:5px;
+      background:#222; padding:5px; border-radius:5px;
     }
   </style>
 </head>
@@ -80,7 +56,6 @@
 
 <div class="sidebar">
   <h2>Looply</h2>
-
   <div class="menu" onclick="show('login')">Login</div>
   <div class="menu" onclick="show('explore')">Explore</div>
   <div class="menu" onclick="show('create')">Create</div>
@@ -89,34 +64,26 @@
 
 <div class="main">
 
-  <!-- LOGIN -->
   <div id="login" class="page active">
     <h2>Login</h2>
-
-    <input id="email" placeholder="Email">
-    <input id="password" type="password" placeholder="Password">
-
+    <input id="emailInput" placeholder="Email">
+    <input id="passwordInput" type="password" placeholder="Password">
     <button onclick="signup()">Sign Up</button>
     <button onclick="login()">Login</button>
   </div>
 
-  <!-- EXPLORE -->
   <div id="explore" class="page">
     <h2>Explore</h2>
     <div id="feed"></div>
   </div>
 
-  <!-- CREATE -->
   <div id="create" class="page">
-    <h2>Create Post</h2>
-
+    <h2>Create</h2>
     <input id="text" placeholder="What's looping?">
     <input id="img" placeholder="Image URL">
-
     <button onclick="createPost()">Post</button>
   </div>
 
-  <!-- TRENDING -->
   <div id="trending" class="page">
     <h2>Trending 🔥</h2>
     <div id="trendFeed"></div>
@@ -126,54 +93,40 @@
 
 <script>
 
-/* ===================================================
-   🔥 SUPABASE CONFIG (PASTE YOUR KEYS HERE)
-=================================================== */
-
+/* ===== PASTE YOUR KEYS HERE ===== */
 const SUPABASE_URL = "https://vspsewltuwxtxgvvkfel.supabase.co";
 const SUPABASE_KEY = "sb_publishable_uiKoJmabgcECsQkhQ_l6nA_Ll429aPH";
-
-/* =================================================== */
+/* ================================ */
 
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let user = null;
-
-/* ================= AUTH ================= */
+/* AUTH */
 async function signup(){
-  let email = document.getElementById("email").value;
-  let password = document.getElementById("password").value;
-
-  await client.auth.signUp({ email, password });
-
-  alert("Check email (if confirmation is enabled)");
+  await client.auth.signUp({
+    email: emailInput.value,
+    password: passwordInput.value
+  });
+  alert("Account created!");
 }
 
 async function login(){
-  let email = document.getElementById("email").value;
-  let password = document.getElementById("password").value;
-
-  let res = await client.auth.signInWithPassword({
-    email,
-    password
+  await client.auth.signInWithPassword({
+    email: emailInput.value,
+    password: passwordInput.value
   });
-
-  user = res.data.user;
 
   show('explore');
   loadPosts();
 }
 
-/* ================= NAV ================= */
+/* NAV */
 function show(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById(page).classList.add('active');
-  loadPosts();
 }
 
-/* ================= CREATE POST ================= */
+/* CREATE POST */
 async function createPost(){
-
   let u = await client.auth.getUser();
 
   await client.from("posts").insert([{
@@ -189,45 +142,115 @@ async function createPost(){
   loadPosts();
 }
 
-/* ================= LOAD POSTS ================= */
-async function loadPosts(){
+/* LIKE */
+async function likePost(post){
+  let u = await client.auth.getUser();
 
-  let { data } = await client
-    .from("posts")
+  let { data } = await client.from("likes")
     .select("*")
-    .order("id", { ascending:false });
+    .eq("user_id", u.data.user.id)
+    .eq("post_id", post.id);
 
-  render(data || []);
+  if(data.length > 0) return alert("Already liked");
+
+  await client.from("likes").insert([{
+    user_id: u.data.user.id,
+    post_id: post.id
+  }]);
+
+  loadPosts();
 }
 
-/* ================= RENDER ================= */
-function render(posts){
+/* FOLLOW */
+async function follow(userId){
+  let u = await client.auth.getUser();
+
+  let { data } = await client.from("follows")
+    .select("*")
+    .eq("follower_id", u.data.user.id)
+    .eq("following_id", userId);
+
+  if(data.length > 0) return alert("Already following");
+
+  await client.from("follows").insert([{
+    follower_id: u.data.user.id,
+    following_id: userId
+  }]);
+
+  loadPosts();
+}
+
+/* COMMENT */
+async function addComment(postId){
+  let u = await client.auth.getUser();
+
+  let input = document.getElementById("comment-" + postId);
+
+  await client.from("comments").insert([{
+    user_id: u.data.user.id,
+    user_name: u.data.user.email,
+    post_id: postId,
+    text: input.value
+  }]);
+
+  input.value = "";
+  loadPosts();
+}
+
+/* LOAD */
+async function loadPosts(){
+
+  let { data: posts } = await client.from("posts").select("*").order("id",{ascending:false});
+  let { data: likes } = await client.from("likes").select("*");
+  let { data: comments } = await client.from("comments").select("*");
+
+  render(posts || [], likes || [], comments || []);
+}
+
+/* RENDER */
+function render(posts, likes, comments){
 
   feed.innerHTML = "";
   trendFeed.innerHTML = "";
 
   let trending = [...posts].sort((a,b)=>b.id - a.id);
 
-  posts.forEach(p=>draw(p, feed));
-  trending.slice(0,5).forEach(p=>draw(p, trendFeed));
+  posts.forEach(p => drawPost(p, likes, comments, feed));
+  trending.slice(0,5).forEach(p => drawPost(p, likes, comments, trendFeed));
 }
 
-/* ================= DRAW ================= */
-function draw(p, container){
+/* DRAW POST */
+function drawPost(p, likes, comments, container){
+
+  let postLikes = likes.filter(l=>l.post_id===p.id).length;
+  let postComments = comments.filter(c=>c.post_id===p.id);
 
   let el = document.createElement("div");
   el.className = "post";
 
   el.innerHTML = `
     <b>${p.user_name}</b>
-    <div>${p.content}</div>
+    <div>${p.content || ""}</div>
     ${p.image ? `<img src="${p.image}">` : ""}
+
+    <div class="btn" onclick='likePost(${JSON.stringify(p)})'>
+      ❤️ ${postLikes}
+    </div>
+
+    <div class="btn" onclick="follow('${p.user_id}')">
+      👥 Follow
+    </div>
+
+    ${postComments.map(c=>`<div class="comment">💬 ${c.user_name}: ${c.text}</div>`).join("")}
+
+    <input id="comment-${p.id}" placeholder="Comment...">
+    <button onclick="addComment(${p.id})">Post</button>
   `;
 
   container.appendChild(el);
 }
 
-/* ================= INIT ================= */
+/* INIT */
 loadPosts();
 
 </script>
