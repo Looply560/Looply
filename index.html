@@ -7,68 +7,28 @@
   <style>
     body { margin:0; font-family:Arial; background:#0f0f0f; color:white; display:flex; }
 
-    .sidebar {
-      width:180px; height:100vh; background:#111;
-      padding:10px; position:fixed;
-    }
+    .sidebar { width:180px; height:100vh; background:#111; padding:10px; position:fixed; }
 
-    .menu {
-      padding:10px; margin:10px 0;
-      background:#222; border-radius:8px;
-      cursor:pointer;
-    }
+    .menu { padding:10px; margin:10px 0; background:#222; border-radius:8px; cursor:pointer; }
 
     .main { margin-left:190px; width:100%; padding:15px; }
 
     .page { display:none; }
     .active { display:block; }
 
-    .post {
-      background:#1a1a1a; padding:12px;
-      margin:12px 0; border-radius:12px;
-    }
+    .post { background:#1a1a1a; padding:12px; margin:12px 0; border-radius:12px; }
 
-    input, button {
-      width:100%; padding:10px;
-      margin-top:6px; border-radius:6px;
-      border:none;
-    }
+    input, button { width:100%; padding:10px; margin-top:6px; border-radius:6px; border:none; }
 
     button { background:#ff2d55; color:white; cursor:pointer; }
 
     img { max-width:100%; border-radius:10px; margin-top:10px; }
 
-    .btn {
-      padding:8px;
-      background:#333;
-      margin-top:5px;
-      border-radius:6px;
-      text-align:center;
-      cursor:pointer;
-    }
+    .btn { padding:8px; background:#333; margin-top:5px; border-radius:6px; cursor:pointer; }
 
-    .profile {
-      display:flex;
-      align-items:center;
-      gap:8px;
-      cursor:pointer;
-      margin-bottom:5px;
-    }
+    .comment { font-size:12px; background:#222; padding:5px; margin-top:5px; border-radius:5px; }
 
-    .avatar {
-      width:30px;
-      height:30px;
-      border-radius:50%;
-      background:#444;
-    }
-
-    .comment {
-      font-size:12px;
-      background:#222;
-      padding:5px;
-      margin-top:5px;
-      border-radius:5px;
-    }
+    .profile { font-size:12px; opacity:0.8; margin-bottom:5px; }
   </style>
 </head>
 
@@ -76,7 +36,6 @@
 
 <div class="sidebar">
   <h2>Looply</h2>
-
   <div class="menu" onclick="show('login')">Login</div>
   <div class="menu" onclick="show('explore')">Explore</div>
   <div class="menu" onclick="show('following')">Following</div>
@@ -86,99 +45,82 @@
 
 <div class="main">
 
-  <!-- LOGIN -->
   <div id="login" class="page active">
     <h2>Login</h2>
 
-    <input id="emailInput" placeholder="Email">
-    <input id="passwordInput" type="password" placeholder="Password">
-
-    <input id="usernameInput" placeholder="Username">
-    <input id="avatarInput" placeholder="Profile Pic URL">
+    <input id="emailInput">
+    <input id="passwordInput" type="password">
+    <input id="usernameInput" placeholder="username">
+    <input id="avatarInput" placeholder="avatar url">
 
     <button onclick="signup()">Sign Up</button>
     <button onclick="login()">Login</button>
   </div>
 
-  <!-- EXPLORE -->
-  <div id="explore" class="page">
-    <h2>Explore</h2>
-    <div id="feed"></div>
-  </div>
+  <div id="explore" class="page"><div id="feed"></div></div>
+  <div id="following" class="page"><div id="followFeed"></div></div>
 
-  <!-- FOLLOWING -->
-  <div id="following" class="page">
-    <h2>Following</h2>
-    <div id="followFeed"></div>
-  </div>
-
-  <!-- CREATE -->
   <div id="create" class="page">
-    <h2>Create Post</h2>
-    <input id="text" placeholder="What's looping?">
-    <input id="img" placeholder="Image URL">
+    <input id="text">
+    <input id="img">
     <button onclick="createPost()">Post</button>
   </div>
 
-  <!-- TRENDING -->
-  <div id="trending" class="page">
-    <h2>Trending 🔥</h2>
-    <div id="trendFeed"></div>
-  </div>
+  <div id="trending" class="page"><div id="trendFeed"></div></div>
 
 </div>
 
 <script>
 
-/* ================= CONFIG ================= */
+/* CONFIG */
 const SUPABASE_URL = "https://vspsewltuwxtxgvvkfel.supabase.co";
-const SUPABASE_KEY = "sb_publishable_uiKoJmabgcECsQkhQ_l6nA_Ll429aPH";
+const SUPABASE_KEY = "Anon sb_publishable_uiKoJmabgcECsQkhQ_l6nA_Ll429aPH";
 
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let currentUser = null;
+let user = null;
 
-/* ================= SIGNUP ================= */
+/* SIGNUP */
 async function signup(){
 
-  let { data: userData } = await client.auth.signUp({
+  let { data } = await client.auth.signUp({
     email: emailInput.value,
     password: passwordInput.value
   });
 
-  await client.from("profiles").insert([{
-    id: userData.user.id,
-    username: usernameInput.value,
-    avatar: avatarInput.value
-  }]);
+  if(data?.user){
+    await client.from("profiles").insert([{
+      id: data.user.id,
+      username: usernameInput.value,
+      avatar: avatarInput.value
+    }]);
+  }
 
-  alert("Account created!");
+  alert("Account created");
 }
 
-/* ================= LOGIN ================= */
+/* LOGIN */
 async function login(){
 
-  let { data } = await client.auth.signInWithPassword({
+  let res = await client.auth.signInWithPassword({
     email: emailInput.value,
     password: passwordInput.value
   });
 
-  currentUser = data.user;
+  user = res.data.user;
 
   show('explore');
   loadPosts();
 }
 
-/* ================= NAV ================= */
-function show(page){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.getElementById(page).classList.add('active');
-  loadPosts();
+/* NAV */
+function show(p){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.getElementById(p).classList.add('active');
 }
 
-/* ================= CREATE ================= */
+/* POST */
 async function createPost(){
-
   let u = await client.auth.getUser();
 
   await client.from("posts").insert([{
@@ -193,37 +135,21 @@ async function createPost(){
   loadPosts();
 }
 
-/* ================= FOLLOW ================= */
-async function follow(userId){
-
+/* FOLLOW */
+async function follow(id){
   let u = await client.auth.getUser();
-
-  let { data } = await client.from("follows")
-    .select("*")
-    .eq("follower_id", u.data.user.id)
-    .eq("following_id", userId);
-
-  if(data.length) return;
 
   await client.from("follows").insert([{
     follower_id: u.data.user.id,
-    following_id: userId
+    following_id: id
   }]);
 
   loadPosts();
 }
 
-/* ================= LIKE ================= */
-async function likePost(post){
-
+/* LIKE */
+async function like(post){
   let u = await client.auth.getUser();
-
-  let { data } = await client.from("likes")
-    .select("*")
-    .eq("user_id", u.data.user.id)
-    .eq("post_id", post.id);
-
-  if(data.length) return;
 
   await client.from("likes").insert([{
     user_id: u.data.user.id,
@@ -233,73 +159,91 @@ async function likePost(post){
   loadPosts();
 }
 
-/* ================= LOAD ================= */
+/* COMMENT */
+async function comment(postId){
+  let u = await client.auth.getUser();
+
+  let input = document.getElementById("c-"+postId);
+
+  await client.from("comments").insert([{
+    user_id: u.data.user.id,
+    post_id: postId,
+    user_name: u.data.user.email,
+    text: input.value
+  }]);
+
+  input.value = "";
+  loadPosts();
+}
+
+/* LOAD */
 async function loadPosts(){
 
   let { data: posts } = await client.from("posts").select("*").order("id",{ascending:false});
   let { data: profiles } = await client.from("profiles").select("*");
   let { data: likes } = await client.from("likes").select("*");
   let { data: follows } = await client.from("follows").select("*");
+  let { data: comments } = await client.from("comments").select("*");
 
-  render(posts || [], profiles || [], likes || [], follows || []);
+  render(posts||[], profiles||[], likes||[], follows||[], comments||[]);
 }
 
-/* ================= RENDER ================= */
-function render(posts, profiles, likes, follows){
+/* RENDER */
+function render(posts, profiles, likes, follows, comments){
 
   feed.innerHTML = "";
   followFeed.innerHTML = "";
   trendFeed.innerHTML = "";
 
-  let trending = [...posts].sort((a,b)=>b.id - a.id);
+  let uid = user?.id;
 
-  posts.forEach(p=>draw(p, profiles, likes, follows, feed));
-
-  let u = currentUser?.id;
-
-  let followingIds = follows
-    .filter(f=>f.follower_id === u)
+  let following = follows
+    .filter(f=>f.follower_id===uid)
     .map(f=>f.following_id);
 
-  posts
-    .filter(p=>followingIds.includes(p.user_id))
-    .forEach(p=>draw(p, profiles, likes, follows, followFeed));
+  posts.forEach(p=>draw(p, profiles, likes, comments, feed));
 
-  trending.slice(0,5).forEach(p=>draw(p, profiles, likes, follows, trendFeed));
+  posts
+    .filter(p=>following.includes(p.user_id))
+    .forEach(p=>draw(p, profiles, likes, comments, followFeed));
+
+  posts
+    .slice(0,5)
+    .forEach(p=>draw(p, profiles, likes, comments, trendFeed));
 }
 
-/* ================= DRAW ================= */
-function draw(p, profiles, likes, follows, container){
+/* DRAW */
+function draw(p, profiles, likes, comments, container){
 
-  let profile = profiles.find(pr=>pr.id === p.user_id);
-
-  let postLikes = likes.filter(l=>l.post_id === p.id).length;
+  let profile = profiles.find(x=>x.id===p.user_id);
+  let postLikes = likes.filter(l=>l.post_id===p.id).length;
+  let postComments = comments.filter(c=>c.post_id===p.id);
 
   let el = document.createElement("div");
-  el.className = "post";
+  el.className="post";
 
   el.innerHTML = `
     <div class="profile">
-      <div class="avatar" style="background-image:url('${profile?.avatar || ""}'); background-size:cover;"></div>
       <b>${profile?.username || "user"}</b>
     </div>
 
-    <div>${p.content || ""}</div>
+    <div>${p.content}</div>
     ${p.image ? `<img src="${p.image}">` : ""}
 
-    <div class="btn" onclick='likePost(${JSON.stringify(p)})'>
-      ❤️ ${postLikes}
-    </div>
+    <div class="btn" onclick='like(${JSON.stringify(p)})'>❤️ ${postLikes}</div>
+    <div class="btn" onclick="follow('${p.user_id}')">👥 Follow</div>
 
-    <div class="btn" onclick="follow('${p.user_id}')">
-      👥 Follow
-    </div>
+    ${postComments.map(c=>`
+      <div class="comment">💬 ${c.user_name}: ${c.text}</div>
+    `).join("")}
+
+    <input id="c-${p.id}" placeholder="comment">
+    <button onclick="comment(${p.id})">Send</button>
   `;
 
   container.appendChild(el);
 }
 
-/* ================= INIT ================= */
 loadPosts();
 
 </script>
