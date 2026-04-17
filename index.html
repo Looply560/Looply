@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Looply</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+    }
+
+    header {
+      background: #111;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      font-size: 24px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: auto;
+      padding: 10px;
+    }
+
+    .post-box {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      background: #111;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .post {
+      background: white;
+      padding: 15px;
+      margin-top: 10px;
+      border-radius: 10px;
+    }
+
+    .like {
+      margin-top: 10px;
+      color: blue;
+      cursor: pointer;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>LOOPLY</header>
+
+<div class="container">
+
+  <div class="post-box">
+    <input id="postInput" placeholder="What's looping?" />
+    <button onclick="addPost()">Post</button>
+  </div>
+
+  <div id="feed"></div>
+
+</div>
+
+<script>
+function addPost() {
+  let input = document.getElementById("postInput");
+  let text = input.value.trim();
+
+  if (text === "") return;
+
+  let post = document.createElement("div");
+  post.className = "post";
+
+  post.innerHTML = `
+    <div>${text}</div>
+    <div class="like" onclick="likePost(this)">
+      Like ❤️ (<span>0</span>)
+    </div>
+  `;
+
+  document.getElementById("feed").prepend(post);
+  input.value = "";
+}
+
+function likePost(el) {
+  let count = el.querySelector("span");
+  count.innerText = parseInt(count.innerText) + 1;
+}
+</script>
+
+</body>
+</html>
