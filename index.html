@@ -3,110 +3,182 @@
 <head>
   <title>Looply</title>
   <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f2f2f2;
+    body { margin:0; font-family:Arial; display:flex; background:#f2f2f2; }
+
+    .sidebar {
+      width:180px; height:100vh; background:#111; color:white;
+      padding:10px; position:fixed;
     }
 
-    header {
-      background: #111;
-      color: white;
-      padding: 15px;
-      text-align: center;
-      font-size: 24px;
-      font-weight: bold;
-      letter-spacing: 1px;
-    }
+    .menu { padding:10px; background:#222; margin:10px 0; cursor:pointer; }
 
-    .container {
-      max-width: 500px;
-      margin: auto;
-      padding: 10px;
-    }
+    .main { margin-left:190px; width:100%; padding:10px; }
 
-    .post-box {
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      margin-top: 15px;
-    }
-
-    input {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-    }
-
-    button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      background: #111;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
+    .page { display:none; }
+    .active { display:block; }
 
     .post {
-      background: white;
-      padding: 15px;
-      margin-top: 10px;
-      border-radius: 10px;
+      background:white; padding:10px; margin:10px 0; border-radius:10px;
     }
 
-    .like {
-      margin-top: 10px;
-      color: blue;
-      cursor: pointer;
-      font-size: 14px;
+    input, button {
+      width:100%; padding:10px; margin-top:5px;
+    }
+
+    img { max-width:100%; border-radius:10px; margin-top:10px; }
+
+    .like { color:blue; cursor:pointer; margin-top:5px; }
+
+    .comment { font-size:12px; background:#eee; padding:5px; margin-top:5px; border-radius:5px; }
+
+    .profile {
+      background:white; padding:10px; border-radius:10px;
     }
   </style>
 </head>
 
 <body>
 
-<header>LOOPLY</header>
+<div class="sidebar">
+  <h2>Looply</h2>
+  <div class="menu" onclick="show('explore')">Explore</div>
+  <div class="menu" onclick="show('create')">Create</div>
+  <div class="menu" onclick="show('following')">Following</div>
+</div>
 
-<div class="container">
+<div class="main">
 
-  <div class="post-box">
-    <input id="postInput" placeholder="What's looping?" />
-    <button onclick="addPost()">Post</button>
+  <div id="explore" class="page active">
+    <h2>Explore</h2>
+    <div id="feed"></div>
   </div>
 
-  <div id="feed"></div>
+  <div id="create" class="page">
+    <h2>Create</h2>
+
+    <input id="user" placeholder="Username">
+    <input id="text" placeholder="What's looping?">
+    <input id="img" placeholder="Image URL (optional)">
+    <button onclick="post()">Post</button>
+  </div>
+
+  <div id="following" class="page">
+    <h2>Following Feed</h2>
+    <div id="followFeed"></div>
+  </div>
 
 </div>
 
 <script>
-function addPost() {
-  let input = document.getElementById("postInput");
-  let text = input.value.trim();
 
-  if (text === "") return;
+let posts = JSON.parse(localStorage.getItem("posts") || "[]");
+let following = JSON.parse(localStorage.getItem("following") || "[]");
 
-  let post = document.createElement("div");
-  post.className = "post";
-
-  post.innerHTML = `
-    <div>${text}</div>
-    <div class="like" onclick="likePost(this)">
-      Like ❤️ (<span>0</span>)
-    </div>
-  `;
-
-  document.getElementById("feed").prepend(post);
-  input.value = "";
+/* NAV */
+function show(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(page).classList.add('active');
+  render();
 }
 
-function likePost(el) {
-  let count = el.querySelector("span");
-  count.innerText = parseInt(count.innerText) + 1;
+/* CREATE POST */
+function post(){
+  let p = {
+    id: Date.now(),
+    user: user.value || "Anon",
+    text: text.value,
+    img: img.value,
+    likes: 0,
+    likedBy: [],
+    comments: []
+  };
+
+  posts.unshift(p);
+  save();
+  render();
+
+  text.value = "";
+  img.value = "";
 }
+
+/* SAVE */
+function save(){
+  localStorage.setItem("posts", JSON.stringify(posts));
+  localStorage.setItem("following", JSON.stringify(following));
+}
+
+/* LIKE TOGGLE (1 like per user simulation) */
+function like(id){
+  let p = posts.find(x=>x.id===id);
+
+  if(p.likedBy.includes("me")){
+    p.likedBy = p.likedBy.filter(x=>x!=="me");
+    p.likes--;
+  } else {
+    p.likedBy.push("me");
+    p.likes++;
+  }
+
+  save();
+  render();
+}
+
+/* COMMENT */
+function comment(id, val){
+  let p = posts.find(x=>x.id===id);
+  p.comments.unshift(val);
+  save();
+  render();
+}
+
+/* FOLLOW USER */
+function follow(user){
+  if(!following.includes(user)){
+    following.push(user);
+  } else {
+    following = following.filter(u=>u!==user);
+  }
+  save();
+  render();
+}
+
+/* RENDER */
+function render(){
+
+  feed.innerHTML = "";
+  followFeed.innerHTML = "";
+
+  posts.forEach(p=>{
+
+    let el = document.createElement("div");
+    el.className="post";
+
+    el.innerHTML = `
+      <b onclick="follow('${p.user}')">${p.user}</b>
+      <div>${p.text}</div>
+      ${p.img ? `<img src="${p.img}">` : ""}
+
+      <div class="like" onclick="like(${p.id})">
+        ❤️ Like (${p.likes})
+      </div>
+
+      <input placeholder="comment..." onkeydown="if(event.key==='Enter'){comment(${p.id}, this.value); this.value=''}">
+
+      <div>
+        ${p.comments.map(c=>`<div class="comment">${c}</div>`).join("")}
+      </div>
+    `;
+
+    feed.appendChild(el);
+
+    if(following.includes(p.user)){
+      followFeed.appendChild(el.cloneNode(true));
+    }
+  });
+}
+
+render();
+
 </script>
 
 </body>
