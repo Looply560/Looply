@@ -14,7 +14,8 @@
 
     .menu {
       padding:10px; margin:10px 0;
-      background:#222; border-radius:8px; cursor:pointer;
+      background:#222; border-radius:8px;
+      cursor:pointer;
     }
 
     .main { margin-left:190px; width:100%; padding:15px; }
@@ -28,26 +29,38 @@
     }
 
     input, button {
-      width:100%; padding:10px; margin-top:6px;
-      border-radius:6px; border:none;
+      width:100%; padding:10px;
+      margin-top:6px; border-radius:6px;
+      border:none;
     }
 
-    button { background:#ff2d55; color:white; cursor:pointer; }
+    button {
+      background:#ff2d55;
+      color:white;
+      cursor:pointer;
+    }
 
     img {
-      max-width:100%; border-radius:10px;
+      max-width:100%;
+      border-radius:10px;
       margin-top:10px;
     }
 
     .btn {
-      padding:8px; background:#333;
-      margin-top:5px; border-radius:6px;
-      text-align:center; cursor:pointer;
+      padding:8px;
+      background:#333;
+      margin-top:5px;
+      border-radius:6px;
+      cursor:pointer;
+      text-align:center;
     }
 
     .comment {
-      font-size:13px; margin-top:5px;
-      background:#222; padding:5px; border-radius:5px;
+      font-size:12px;
+      background:#222;
+      padding:5px;
+      margin-top:5px;
+      border-radius:5px;
     }
   </style>
 </head>
@@ -64,26 +77,34 @@
 
 <div class="main">
 
+  <!-- LOGIN -->
   <div id="login" class="page active">
     <h2>Login</h2>
+
     <input id="emailInput" placeholder="Email">
     <input id="passwordInput" type="password" placeholder="Password">
+
     <button onclick="signup()">Sign Up</button>
     <button onclick="login()">Login</button>
   </div>
 
+  <!-- EXPLORE -->
   <div id="explore" class="page">
     <h2>Explore</h2>
     <div id="feed"></div>
   </div>
 
+  <!-- CREATE -->
   <div id="create" class="page">
-    <h2>Create</h2>
+    <h2>Create Post</h2>
+
     <input id="text" placeholder="What's looping?">
     <input id="img" placeholder="Image URL">
+
     <button onclick="createPost()">Post</button>
   </div>
 
+  <!-- TRENDING -->
   <div id="trending" class="page">
     <h2>Trending 🔥</h2>
     <div id="trendFeed"></div>
@@ -93,40 +114,50 @@
 
 <script>
 
-/* ===== PASTE YOUR KEYS HERE ===== */
+/* ================= SUPABASE CONFIG ================= */
 const SUPABASE_URL = "https://vspsewltuwxtxgvvkfel.supabase.co";
 const SUPABASE_KEY = "sb_publishable_uiKoJmabgcECsQkhQ_l6nA_Ll429aPH";
-/* ================================ */
 
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* AUTH */
+/* ================= AUTH ================= */
 async function signup(){
-  await client.auth.signUp({
+  let { data, error } = await client.auth.signUp({
     email: emailInput.value,
     password: passwordInput.value
   });
-  alert("Account created!");
+
+  if(error){
+    alert(error.message);
+  } else {
+    alert("Account created! You can now log in.");
+  }
 }
 
 async function login(){
-  await client.auth.signInWithPassword({
+  let { data, error } = await client.auth.signInWithPassword({
     email: emailInput.value,
     password: passwordInput.value
   });
+
+  if(error){
+    alert(error.message);
+    return;
+  }
 
   show('explore');
   loadPosts();
 }
 
-/* NAV */
+/* ================= NAV ================= */
 function show(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById(page).classList.add('active');
 }
 
-/* CREATE POST */
+/* ================= CREATE POST ================= */
 async function createPost(){
+
   let u = await client.auth.getUser();
 
   await client.from("posts").insert([{
@@ -142,8 +173,61 @@ async function createPost(){
   loadPosts();
 }
 
-/* LIKE */
+/* ================= LOAD POSTS ================= */
+async function loadPosts(){
+
+  let { data: posts } = await client
+    .from("posts")
+    .select("*")
+    .order("id",{ascending:false});
+
+  let { data: likes } = await client.from("likes").select("*");
+  let { data: comments } = await client.from("comments").select("*");
+
+  render(posts || [], likes || [], comments || []);
+}
+
+/* ================= RENDER ================= */
+function render(posts, likes, comments){
+
+  feed.innerHTML = "";
+  trendFeed.innerHTML = "";
+
+  let trending = [...posts].sort((a,b)=>b.id - a.id);
+
+  posts.forEach(p => drawPost(p, likes, comments, feed));
+  trending.slice(0,5).forEach(p => drawPost(p, likes, comments, trendFeed));
+}
+
+/* ================= DRAW ================= */
+function drawPost(p, likes, comments, container){
+
+  let postLikes = likes.filter(l => l.post_id === p.id).length;
+  let postComments = comments.filter(c => c.post_id === p.id);
+
+  let el = document.createElement("div");
+  el.className = "post";
+
+  el.innerHTML = `
+    <b>${p.user_name}</b>
+    <div>${p.content || ""}</div>
+    ${p.image ? `<img src="${p.image}">` : ""}
+
+    <div class="btn" onclick='likePost(${JSON.stringify(p)})'>
+      ❤️ ${postLikes}
+    </div>
+
+    ${postComments.map(c => `
+      <div class="comment">💬 ${c.user_name}: ${c.text}</div>
+    `).join("")}
+  `;
+
+  container.appendChild(el);
+}
+
+/* ================= LIKE ================= */
 async function likePost(post){
+
   let u = await client.auth.getUser();
 
   let { data } = await client.from("likes")
@@ -161,96 +245,7 @@ async function likePost(post){
   loadPosts();
 }
 
-/* FOLLOW */
-async function follow(userId){
-  let u = await client.auth.getUser();
-
-  let { data } = await client.from("follows")
-    .select("*")
-    .eq("follower_id", u.data.user.id)
-    .eq("following_id", userId);
-
-  if(data.length > 0) return alert("Already following");
-
-  await client.from("follows").insert([{
-    follower_id: u.data.user.id,
-    following_id: userId
-  }]);
-
-  loadPosts();
-}
-
-/* COMMENT */
-async function addComment(postId){
-  let u = await client.auth.getUser();
-
-  let input = document.getElementById("comment-" + postId);
-
-  await client.from("comments").insert([{
-    user_id: u.data.user.id,
-    user_name: u.data.user.email,
-    post_id: postId,
-    text: input.value
-  }]);
-
-  input.value = "";
-  loadPosts();
-}
-
-/* LOAD */
-async function loadPosts(){
-
-  let { data: posts } = await client.from("posts").select("*").order("id",{ascending:false});
-  let { data: likes } = await client.from("likes").select("*");
-  let { data: comments } = await client.from("comments").select("*");
-
-  render(posts || [], likes || [], comments || []);
-}
-
-/* RENDER */
-function render(posts, likes, comments){
-
-  feed.innerHTML = "";
-  trendFeed.innerHTML = "";
-
-  let trending = [...posts].sort((a,b)=>b.id - a.id);
-
-  posts.forEach(p => drawPost(p, likes, comments, feed));
-  trending.slice(0,5).forEach(p => drawPost(p, likes, comments, trendFeed));
-}
-
-/* DRAW POST */
-function drawPost(p, likes, comments, container){
-
-  let postLikes = likes.filter(l=>l.post_id===p.id).length;
-  let postComments = comments.filter(c=>c.post_id===p.id);
-
-  let el = document.createElement("div");
-  el.className = "post";
-
-  el.innerHTML = `
-    <b>${p.user_name}</b>
-    <div>${p.content || ""}</div>
-    ${p.image ? `<img src="${p.image}">` : ""}
-
-    <div class="btn" onclick='likePost(${JSON.stringify(p)})'>
-      ❤️ ${postLikes}
-    </div>
-
-    <div class="btn" onclick="follow('${p.user_id}')">
-      👥 Follow
-    </div>
-
-    ${postComments.map(c=>`<div class="comment">💬 ${c.user_name}: ${c.text}</div>`).join("")}
-
-    <input id="comment-${p.id}" placeholder="Comment...">
-    <button onclick="addComment(${p.id})">Post</button>
-  `;
-
-  container.appendChild(el);
-}
-
-/* INIT */
+/* ================= INIT ================= */
 loadPosts();
 
 </script>
