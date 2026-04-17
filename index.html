@@ -10,7 +10,10 @@
       padding:10px; position:fixed;
     }
 
-    .menu { padding:10px; background:#222; margin:10px 0; cursor:pointer; }
+    .menu {
+      padding:10px; background:#222; margin:10px 0; cursor:pointer;
+      border-radius:5px;
+    }
 
     .main { margin-left:190px; width:100%; padding:10px; }
 
@@ -27,12 +30,36 @@
 
     img { max-width:100%; border-radius:10px; margin-top:10px; }
 
-    .like { color:blue; cursor:pointer; margin-top:5px; }
+    .actions {
+      display:flex;
+      gap:10px;
+      margin-top:5px;
+    }
 
-    .comment { font-size:12px; background:#eee; padding:5px; margin-top:5px; border-radius:5px; }
+    .btn {
+      flex:1;
+      padding:8px;
+      text-align:center;
+      cursor:pointer;
+      border-radius:5px;
+      background:#eee;
+    }
 
-    .profile {
-      background:white; padding:10px; border-radius:10px;
+    .liked { background:#ffd6d6; }
+    .followed { background:#d6e6ff; }
+
+    .comment {
+      font-size:12px;
+      background:#eee;
+      padding:5px;
+      margin-top:5px;
+      border-radius:5px;
+    }
+
+    .usernameLock {
+      font-size:12px;
+      color:gray;
+      margin-bottom:5px;
     }
   </style>
 </head>
@@ -54,11 +81,14 @@
   </div>
 
   <div id="create" class="page">
-    <h2>Create</h2>
+    <h2>Create Post</h2>
+
+    <div class="usernameLock" id="userStatus"></div>
 
     <input id="user" placeholder="Username">
     <input id="text" placeholder="What's looping?">
     <input id="img" placeholder="Image URL (optional)">
+    <button onclick="saveUser()">Set Username</button>
     <button onclick="post()">Post</button>
   </div>
 
@@ -72,7 +102,28 @@
 <script>
 
 let posts = JSON.parse(localStorage.getItem("posts") || "[]");
+let currentUser = localStorage.getItem("user") || "";
 let following = JSON.parse(localStorage.getItem("following") || "[]");
+
+/* LOCK USERNAME */
+function saveUser(){
+  if(!currentUser){
+    currentUser = user.value.trim();
+    if(!currentUser) return;
+
+    localStorage.setItem("user", currentUser);
+    user.value = "";
+  }
+
+  updateUserUI();
+}
+
+/* SHOW USER STATUS */
+function updateUserUI(){
+  userStatus.innerText = currentUser
+    ? "Logged in as: " + currentUser + " (locked)"
+    : "No username set yet";
+}
 
 /* NAV */
 function show(page){
@@ -83,13 +134,15 @@ function show(page){
 
 /* CREATE POST */
 function post(){
+  if(!currentUser) return alert("Set username first!");
+
   let p = {
     id: Date.now(),
-    user: user.value || "Anon",
+    user: currentUser,
     text: text.value,
     img: img.value,
     likes: 0,
-    likedBy: [],
+    liked: false,
     comments: []
   };
 
@@ -107,15 +160,15 @@ function save(){
   localStorage.setItem("following", JSON.stringify(following));
 }
 
-/* LIKE TOGGLE (1 like per user simulation) */
+/* LIKE TOGGLE */
 function like(id){
   let p = posts.find(x=>x.id===id);
 
-  if(p.likedBy.includes("me")){
-    p.likedBy = p.likedBy.filter(x=>x!=="me");
+  if(p.liked){
+    p.liked = false;
     p.likes--;
   } else {
-    p.likedBy.push("me");
+    p.liked = true;
     p.likes++;
   }
 
@@ -123,21 +176,30 @@ function like(id){
   render();
 }
 
-/* COMMENT */
-function comment(id, val){
-  let p = posts.find(x=>x.id===id);
-  p.comments.unshift(val);
+/* FOLLOW TOGGLE */
+function follow(user){
+  if(user === currentUser) return;
+
+  if(following.includes(user)){
+    following = following.filter(u=>u!==user);
+  } else {
+    following.push(user);
+  }
+
   save();
   render();
 }
 
-/* FOLLOW USER */
-function follow(user){
-  if(!following.includes(user)){
-    following.push(user);
-  } else {
-    following = following.filter(u=>u!==user);
-  }
+/* COMMENT */
+function comment(id, textInput){
+  let p = posts.find(x=>x.id===id);
+  if(!textInput.trim()) return;
+
+  p.comments.unshift({
+    user: currentUser,
+    text: textInput
+  });
+
   save();
   render();
 }
@@ -153,19 +215,31 @@ function render(){
     let el = document.createElement("div");
     el.className="post";
 
+    let isLiked = p.liked ? "liked" : "";
+    let isFollowed = following.includes(p.user) ? "followed" : "";
+
     el.innerHTML = `
-      <b onclick="follow('${p.user}')">${p.user}</b>
+      <b>${p.user}</b>
+
       <div>${p.text}</div>
       ${p.img ? `<img src="${p.img}">` : ""}
 
-      <div class="like" onclick="like(${p.id})">
-        ❤️ Like (${p.likes})
+      <div class="actions">
+        <div class="btn ${isLiked}" onclick="like(${p.id})">
+          ❤️ ${p.likes}
+        </div>
+
+        <div class="btn ${isFollowed}" onclick="follow('${p.user}')">
+          👥 Follow
+        </div>
       </div>
 
       <input placeholder="comment..." onkeydown="if(event.key==='Enter'){comment(${p.id}, this.value); this.value=''}">
 
       <div>
-        ${p.comments.map(c=>`<div class="comment">${c}</div>`).join("")}
+        ${p.comments.map(c=>
+          `<div class="comment"><b>${c.user}:</b> ${c.text}</div>`
+        ).join("")}
       </div>
     `;
 
@@ -177,6 +251,8 @@ function render(){
   });
 }
 
+/* INIT */
+updateUserUI();
 render();
 
 </script>
