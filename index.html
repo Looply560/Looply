@@ -5,51 +5,73 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
-    body { margin:0; font-family:Arial; display:flex; background:#f2f2f2; }
+    body {
+      margin:0;
+      font-family: Arial;
+      background:#0f0f0f;
+      color:white;
+      display:flex;
+    }
 
     .sidebar {
-      width:180px; height:100vh; background:#111; color:white;
-      padding:10px; position:fixed;
+      width:180px;
+      height:100vh;
+      background:#111;
+      padding:10px;
+      position:fixed;
     }
 
     .menu {
-      padding:10px; background:#222; margin:10px 0; cursor:pointer;
-      border-radius:5px;
+      padding:10px;
+      margin:10px 0;
+      background:#222;
+      border-radius:8px;
+      cursor:pointer;
     }
 
-    .main { margin-left:190px; width:100%; padding:10px; }
+    .main {
+      margin-left:190px;
+      width:100%;
+      padding:15px;
+    }
 
     .page { display:none; }
     .active { display:block; }
 
     .post {
-      background:white; padding:10px; margin:10px 0; border-radius:10px;
+      background:#1a1a1a;
+      padding:12px;
+      margin:12px 0;
+      border-radius:12px;
     }
 
     input, button {
-      width:100%; padding:10px; margin-top:5px;
+      width:100%;
+      padding:10px;
+      margin-top:6px;
+      border-radius:6px;
+      border:none;
     }
 
-    img { max-width:100%; border-radius:10px; margin-top:10px; }
+    button {
+      background:#ff2d55;
+      color:white;
+      cursor:pointer;
+    }
 
-    .actions { display:flex; gap:10px; margin-top:5px; }
+    img {
+      max-width:100%;
+      border-radius:10px;
+      margin-top:10px;
+    }
 
     .btn {
-      flex:1; padding:8px; text-align:center;
-      cursor:pointer; border-radius:5px; background:#eee;
-    }
-
-    .liked { background:#ffd6d6; }
-    .followed { background:#d6e6ff; }
-
-    .comment {
-      font-size:12px; background:#eee; padding:5px;
-      margin-top:5px; border-radius:5px;
-    }
-
-    .loginBox {
-      background:white; padding:10px; border-radius:10px;
-      margin-bottom:10px;
+      padding:8px;
+      background:#333;
+      margin-top:5px;
+      border-radius:6px;
+      text-align:center;
+      cursor:pointer;
     }
   </style>
 </head>
@@ -58,15 +80,28 @@
 
 <div class="sidebar">
   <h2>Looply</h2>
+
+  <div class="menu" onclick="show('login')">Login</div>
   <div class="menu" onclick="show('explore')">Explore</div>
   <div class="menu" onclick="show('create')">Create</div>
-  <div class="menu" onclick="show('following')">Following</div>
+  <div class="menu" onclick="show('trending')">Trending</div>
 </div>
 
 <div class="main">
 
+  <!-- LOGIN -->
+  <div id="login" class="page active">
+    <h2>Login</h2>
+
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
+
+    <button onclick="signup()">Sign Up</button>
+    <button onclick="login()">Login</button>
+  </div>
+
   <!-- EXPLORE -->
-  <div id="explore" class="page active">
+  <div id="explore" class="page">
     <h2>Explore</h2>
     <div id="feed"></div>
   </div>
@@ -75,138 +110,124 @@
   <div id="create" class="page">
     <h2>Create Post</h2>
 
-    <div class="loginBox">
-      <input id="user" placeholder="Username">
-      <button onclick="setUser()">Set Username</button>
-      <div id="status"></div>
-    </div>
-
     <input id="text" placeholder="What's looping?">
-    <input id="img" placeholder="Image URL (optional)">
+    <input id="img" placeholder="Image URL">
+
     <button onclick="createPost()">Post</button>
   </div>
 
-  <!-- FOLLOWING -->
-  <div id="following" class="page">
-    <h2>Following Feed</h2>
-    <div id="followFeed"></div>
+  <!-- TRENDING -->
+  <div id="trending" class="page">
+    <h2>Trending 🔥</h2>
+    <div id="trendFeed"></div>
   </div>
 
 </div>
 
 <script>
 
+/* ===================================================
+   🔥 SUPABASE CONFIG (PASTE YOUR KEYS HERE)
+=================================================== */
+
 const SUPABASE_URL = "https://vspsewltuwxtxgvvkfel.supabase.co";
 const SUPABASE_KEY = "sb_publishable_uiKoJmabgcECsQkhQ_l6nA_Ll429aPH";
 
-/* INIT SUPABASE */
+/* =================================================== */
+
 const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* STATE */
-let currentUser = "";
-let following = [];
+let user = null;
 
-/* SET USER */
-function setUser(){
-  currentUser = document.getElementById("user").value;
-  document.getElementById("status").innerText =
-    "Logged in as: " + currentUser;
+/* ================= AUTH ================= */
+async function signup(){
+  let email = document.getElementById("email").value;
+  let password = document.getElementById("password").value;
+
+  await client.auth.signUp({ email, password });
+
+  alert("Check email (if confirmation is enabled)");
 }
 
-/* NAV */
+async function login(){
+  let email = document.getElementById("email").value;
+  let password = document.getElementById("password").value;
+
+  let res = await client.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  user = res.data.user;
+
+  show('explore');
+  loadPosts();
+}
+
+/* ================= NAV ================= */
 function show(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById(page).classList.add('active');
   loadPosts();
 }
 
-/* CREATE POST */
+/* ================= CREATE POST ================= */
 async function createPost(){
-  if(!currentUser) return alert("Set username first!");
 
-  let text = document.getElementById("text").value;
-  let img = document.getElementById("img").value;
+  let u = await client.auth.getUser();
 
   await client.from("posts").insert([{
-    user_name: currentUser,
-    content: text,
-    image: img,
-    likes: 0
+    user_id: u.data.user.id,
+    user_name: u.data.user.email,
+    content: text.value,
+    image: img.value
   }]);
 
-  document.getElementById("text").value = "";
-  document.getElementById("img").value = "";
+  text.value = "";
+  img.value = "";
 
   loadPosts();
 }
 
-/* LIKE */
-async function likePost(post){
-  await client.from("posts")
-    .update({ likes: post.likes + 1 })
-    .eq("id", post.id);
-
-  loadPosts();
-}
-
-/* FOLLOW */
-function follow(user){
-  if(following.includes(user)){
-    following = following.filter(u=>u!==user);
-  } else {
-    following.push(user);
-  }
-  loadPosts();
-}
-
-/* LOAD POSTS */
+/* ================= LOAD POSTS ================= */
 async function loadPosts(){
 
-  let { data: posts } = await client
+  let { data } = await client
     .from("posts")
     .select("*")
-    .order("id", { ascending: false });
+    .order("id", { ascending:false });
 
-  render(posts || []);
+  render(data || []);
 }
 
-/* RENDER */
+/* ================= RENDER ================= */
 function render(posts){
 
   feed.innerHTML = "";
-  followFeed.innerHTML = "";
+  trendFeed.innerHTML = "";
 
-  posts.forEach(p=>{
+  let trending = [...posts].sort((a,b)=>b.id - a.id);
 
-    let el = document.createElement("div");
-    el.className = "post";
-
-    el.innerHTML = `
-      <b>${p.user_name}</b>
-
-      <div>${p.content}</div>
-      ${p.image ? `<img src="${p.image}">` : ""}
-
-      <div class="actions">
-        <div class="btn" onclick='likePost(${JSON.stringify(p)})'>
-          ❤️ ${p.likes}
-        </div>
-
-        <div class="btn" onclick="follow('${p.user_name}')">
-          👥 Follow
-        </div>
-      </div>
-    `;
-
-    feed.appendChild(el);
-
-    if(following.includes(p.user_name)){
-      followFeed.appendChild(el.cloneNode(true));
-    }
-  });
+  posts.forEach(p=>draw(p, feed));
+  trending.slice(0,5).forEach(p=>draw(p, trendFeed));
 }
 
-/* AUTO LOAD */
+/* ================= DRAW ================= */
+function draw(p, container){
+
+  let el = document.createElement("div");
+  el.className = "post";
+
+  el.innerHTML = `
+    <b>${p.user_name}</b>
+    <div>${p.content}</div>
+    ${p.image ? `<img src="${p.image}">` : ""}
+  `;
+
+  container.appendChild(el);
+}
+
+/* ================= INIT ================= */
 loadPosts();
 
 </script>
